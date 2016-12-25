@@ -618,7 +618,15 @@ main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
 	AC_DEFINE([BROKEN_GLOB], [1], [OS X glob does not do what we expect])
 	AC_DEFINE_UNQUOTED([BIND_8_COMPAT], [1],
 		[Define if your resolver libs need this for getrrsetbyname])
-	AC_DEFINE([SSH_TUN_FREEBSD], [1], [Open tunnel devices the FreeBSD way])
+	# tun(4) forwarding compat code
+	AC_CHECK_HEADERS([net/if_utun.h])
+	if test "x$ac_cv_header_net_if_utun_h" = "xyes" ; then
+		AC_DEFINE([SSH_TUN_DARWIN], [1],
+		    [Open tunnel devices the Darwin way])
+	else
+		AC_DEFINE([SSH_TUN_FREEBSD], [1],
+		    [Open tunnel devices the FreeBSD way])
+	fi
 	AC_DEFINE([SSH_TUN_COMPAT_AF], [1],
 	    [Use tunnel device compatibility to OpenBSD])
 	AC_DEFINE([SSH_TUN_PREPEND_AF], [1],
