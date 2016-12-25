@@ -43,6 +43,7 @@
  *
  * SSH_TUN_LINUX	Use the (newer) Linux tun/tap device
  * SSH_TUN_FREEBSD	Use the FreeBSD tun/tap device
+ * SSH_TUN_DARWIN	Use the Darwin utun device
  * SSH_TUN_COMPAT_AF	Translate the OpenBSD address family
  * SSH_TUN_PREPEND_AF	Prepend/remove the address family
  */
@@ -193,6 +194,65 @@ sys_tun_open(int tun, int mode)
 	return (-1);
 }
 #endif /* SSH_TUN_FREEBSD */
+
+#ifdef SSH_TUN_DARWIN
+#include <sys/sys_domain.h>
+#include <sys/kern_control.h>
+#include <net/if_utun.h>
+
+int
+sys_tun_open(int tun, int mode)
+{
+	struct ctl_info info;
+	struct sockaddr_ctl addr;
+	int fd;
+
+	if (tun != SSH_TUNID_ANY && tun > SSH_TUNID_MAX) {
+		debug("%s: invalid tunnel %u\n", __func__, tun);
+		return (-1);
+	}
+
+	if (mode == SSH_TUNMODE_ETHERNET) {
+		debug("%s: no layer 2 tunnelling support", __func__);
+		return (-1);
+	}
+
+	fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
+	if (fd == -1) {
+		debug("%s: failed to create control socket: %s",
+		    __func__, strerror(errno));
+		return (-1);
+	}
+
+	bzero(&info, sizeof(info));
+	strlcpy(info.ctl_name, UTUN_CONTROL_NAME, sizeof(info.ctl_name));
+	if (ioctl(fd, CTLIOCGINFO, &info) == -1) {
+		debug("%s: failed to lookup utun control id: %s",
+		    __func__, strerror(errno));
+		goto failed;
+	}
+
+	bzero(&addr, sizeof(addr));
+	addr.sc_id = info.ctl_id;
+	addr.sc_len = sizeof(addr);
+	addr.sc_family = AF_SYSTEM;
+	addr.ss_sysaddr = AF_SYS_CONTROL;
+	if (tun != SSH_TUNID_ANY)
+		addr.sc_unit = tun + 1;
+
+	if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        debug("%s: failed to connect to utun device: %s",
+		    __func__, strerror(errno));
+		goto failed;
+	}
+
+	return (fd);
+
+ failed:
+	close(fd);
+	return (-1);
+}
+#endif /* SSH_TUN_DARWIN */
 
 /*
  * System-specific channel filters

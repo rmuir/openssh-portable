@@ -19,7 +19,8 @@
 
 struct Channel;
 
-#if defined(SSH_TUN_LINUX) || defined(SSH_TUN_FREEBSD)
+#if defined(SSH_TUN_LINUX) || defined(SSH_TUN_FREEBSD) || \
+    defined(SSH_TUN_DARWIN)
 # define CUSTOM_SYS_TUN_OPEN
 int	  sys_tun_open(int, int);
 #endif
